@@ -17,7 +17,7 @@ async function main() {
 
   hud.textContent = 'building scene…';
   const viewer = new ThreeViewer(app, sim.model, sim.state);
-  const input = new KeyboardController(sim, policy);
+  const input = new KeyboardController(sim, policy, viewer);
 
   let lastHud = 0;
   let frames = 0;
@@ -46,7 +46,7 @@ async function main() {
         `policy: ${policy.mode} @ ${policy.controlHz}Hz   ctrl_gen=${ctrlGen}\n` +
         `nq=${sim.model.nq} nv=${sim.model.nv} nu=${sim.model.nu}   ` +
         `${stepCount} sim steps   ${fps.toFixed(0)} fps\n` +
-        `keys: W/S vx · A/D vy · Q/E wz · R reset · Space pause`;
+        `keys: W/S vx · A/D vy · Q/E wz · C cam · R reset · Space pause`;
     }
     requestAnimationFrame(tick);
   };

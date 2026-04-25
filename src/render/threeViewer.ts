@@ -3,6 +3,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import type { ModelView, StateView } from '../sim/types';
 
+export type CameraMode = 'orbit' | 'follow' | 'cinematic';
+
 // MuJoCo geom type enum (mjtGeom)
 const GEOM_PLANE = 0;
 const GEOM_HFIELD = 1;
@@ -26,6 +28,11 @@ export class ThreeViewer {
 
   // Scratch matrix to avoid per-frame allocation.
   private readonly tmpMat = new THREE.Matrix4();
+
+  // Camera mode + cinematic chase-cam state.
+  private cameraMode: CameraMode = 'orbit';
+  private readonly cinemaPos = new THREE.Vector3();
+  private readonly cinemaTarget = new THREE.Vector3();
 
   constructor(container: HTMLElement, model: ModelView, state: StateView) {
     this.model = model;
@@ -294,8 +301,78 @@ export class ThreeViewer {
   }
 
   render(): void {
+    this.updateCamera();
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
+  }
+
+  /** Where the policy thinks "up-from-ground" the robot lives. */
+  private robotEyeHeight = 0.18;
+
+  /**
+   * Per-frame camera adjustments based on the current mode.
+   *  - orbit:     untouched, OrbitControls is the source of truth
+   *  - follow:    orbit target tracks the robot's base; user can still rotate
+   *  - cinematic: smooth trailing chase-cam in the robot's heading direction
+   */
+  private updateCamera(): void {
+    if (this.cameraMode === 'orbit') return;
+
+    const qpos = this.state.qpos;
+    if (qpos.length < 7) return; // no free-joint base — fall back to orbit
+    const bx = qpos[0], by = qpos[1], bz = qpos[2];
+    const qw = qpos[3], qx = qpos[4], qy = qpos[5], qz = qpos[6];
+
+    if (this.cameraMode === 'follow') {
+      // Move the orbit pivot to the robot. User input (drag/scroll) still
+      // works around the moving target.
+      this.controls.target.set(bx, by, bz + this.robotEyeHeight);
+      return;
+    }
+
+    // Cinematic: world-yaw of the body (rotation around z).
+    const yaw = Math.atan2(2 * (qw * qz + qx * qy), 1 - 2 * (qy * qy + qz * qz));
+    const distance = 1.6;
+    const height = 0.55;
+    const desiredPos = new THREE.Vector3(
+      bx - Math.cos(yaw) * distance,
+      by - Math.sin(yaw) * distance,
+      bz + height,
+    );
+    const desiredTarget = new THREE.Vector3(bx, by, bz + this.robotEyeHeight);
+
+    // Critically-damped feel: ~0.08 per 60 fps frame is "snappy but smooth".
+    this.cinemaPos.lerp(desiredPos, 0.08);
+    this.cinemaTarget.lerp(desiredTarget, 0.12);
+    this.camera.position.copy(this.cinemaPos);
+    this.camera.lookAt(this.cinemaTarget);
+  }
+
+  setCameraMode(mode: CameraMode): void {
+    if (mode === this.cameraMode) return;
+    this.cameraMode = mode;
+    if (mode === 'cinematic') {
+      // Seed cinema lerp from current pose so the transition is smooth.
+      this.cinemaPos.copy(this.camera.position);
+      this.cinemaTarget.copy(this.controls.target);
+      this.controls.enabled = false;
+    } else {
+      this.controls.enabled = true;
+      // For 'follow', updateCamera() will retarget to the robot next frame.
+    }
+  }
+
+  cycleCameraMode(): CameraMode {
+    const next: CameraMode =
+      this.cameraMode === 'orbit' ? 'follow'
+      : this.cameraMode === 'follow' ? 'cinematic'
+      : 'orbit';
+    this.setCameraMode(next);
+    return next;
+  }
+
+  get currentCameraMode(): CameraMode {
+    return this.cameraMode;
   }
 
   private onResize(container: HTMLElement): void {

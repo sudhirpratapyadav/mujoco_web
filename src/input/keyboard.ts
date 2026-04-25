@@ -17,6 +17,7 @@
 
 import type { RemoteSim } from '../sim/remoteSim';
 import type { PolicyHandle } from '../policy/policyClient';
+import type { ThreeViewer, CameraMode } from '../render/threeViewer';
 import { VirtualJoystick } from './joystick';
 
 interface Targets {
@@ -45,6 +46,7 @@ export class KeyboardController {
   constructor(
     private sim: RemoteSim,
     private policy: PolicyHandle,
+    private viewer: ThreeViewer,
   ) {
     window.addEventListener('keydown', this.onDown);
     window.addEventListener('keyup', this.onUp);
@@ -64,6 +66,10 @@ export class KeyboardController {
     if (k === ' ') {
       this.togglePause();
       e.preventDefault();
+      return;
+    }
+    if (k === 'c') {
+      this.cycleCamera();
       return;
     }
     // One-shot baseline nudge on press.
@@ -141,6 +147,8 @@ export class KeyboardController {
     });
   }
 
+  private camButtons: HTMLButtonElement[] = [];
+
   private buildTopbar(): void {
     const host = document.getElementById('topbar');
     if (!host) return;
@@ -152,11 +160,30 @@ export class KeyboardController {
       b.addEventListener('click', () => { onClick(); b.blur(); });
       return b;
     };
+    const camBtn = mk(this.cameraLabel(), 'Cycle camera mode (C)', () => this.cycleCamera());
+    this.camButtons.push(camBtn);
     host.replaceChildren(
+      camBtn,
       mk('⏯', 'Pause / resume', () => this.togglePause()),
       mk('↻', 'Reset to home pose', () => this.resetAll()),
       mk('■', 'Stop (zero target velocity)', () => { this.baseline = { vx: 0, vy: 0, wz: 0 }; }),
     );
+  }
+
+  private cycleCamera(): void {
+    this.viewer.cycleCameraMode();
+    this.refreshCamLabels();
+  }
+
+  private cameraLabel(mode: CameraMode = this.viewer.currentCameraMode): string {
+    return mode === 'orbit' ? '📷 Free'
+      : mode === 'follow' ? '📷 Follow'
+      : '📷 Cinema';
+  }
+
+  private refreshCamLabels(): void {
+    const label = this.cameraLabel();
+    for (const b of this.camButtons) b.textContent = label;
   }
 
   private buildButtons(): void {
@@ -168,6 +195,8 @@ export class KeyboardController {
       b.addEventListener('click', () => { onClick(); b.blur(); });
       return b;
     };
+    const camBtn = mk(this.cameraLabel(), () => this.cycleCamera());
+    this.camButtons.push(camBtn);
     host.replaceChildren(
       mk('vx -', () => this.bump('vx', -STEP_LIN)),
       mk('vx +', () => this.bump('vx',  STEP_LIN)),
@@ -178,6 +207,7 @@ export class KeyboardController {
       mk('stop', () => { this.baseline = { vx: 0, vy: 0, wz: 0 }; }),
       mk('reset', () => this.resetAll()),
       mk('pause', () => this.togglePause()),
+      camBtn,
     );
   }
 }
