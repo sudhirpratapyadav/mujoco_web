@@ -33,6 +33,9 @@ export class ThreeViewer {
   private cameraMode: CameraMode = 'orbit';
   private readonly cinemaPos = new THREE.Vector3();
   private readonly cinemaTarget = new THREE.Vector3();
+  // Reusable scratch vectors so updateCamera() doesn't allocate.
+  private readonly _v3 = new THREE.Vector3();
+  private readonly _v3b = new THREE.Vector3();
 
   constructor(container: HTMLElement, model: ModelView, state: StateView) {
     this.model = model;
@@ -324,9 +327,16 @@ export class ThreeViewer {
     const qw = qpos[3], qx = qpos[4], qy = qpos[5], qz = qpos[6];
 
     if (this.cameraMode === 'follow') {
-      // Move the orbit pivot to the robot. User input (drag/scroll) still
-      // works around the moving target.
-      this.controls.target.set(bx, by, bz + this.robotEyeHeight);
+      // Translate the camera with the robot so the orbit offset stays fixed
+      // in world space. Without this, OrbitControls re-reads the offset each
+      // frame and the camera appears to swing around the moving target.
+      const newTarget = this._v3.set(bx, by, bz + this.robotEyeHeight);
+      this.camera.position.add(this._v3b.copy(newTarget).sub(this.controls.target));
+      this.controls.target.copy(newTarget);
+      // OrbitControls.update() will then rotate followOffset if the user is
+      // dragging; we snapshot the post-input offset to carry into next frame.
+      // (controls.update() runs after this in render(); the snapshot happens
+      // implicitly because we read position - target on the next frame.)
       return;
     }
 
@@ -334,16 +344,17 @@ export class ThreeViewer {
     const yaw = Math.atan2(2 * (qw * qz + qx * qy), 1 - 2 * (qy * qy + qz * qz));
     const distance = 1.6;
     const height = 0.55;
-    const desiredPos = new THREE.Vector3(
+    const desiredPos = this._v3.set(
       bx - Math.cos(yaw) * distance,
       by - Math.sin(yaw) * distance,
       bz + height,
     );
-    const desiredTarget = new THREE.Vector3(bx, by, bz + this.robotEyeHeight);
+    const desiredTarget = this._v3b.set(bx, by, bz + this.robotEyeHeight);
 
-    // Critically-damped feel: ~0.08 per 60 fps frame is "snappy but smooth".
-    this.cinemaPos.lerp(desiredPos, 0.08);
-    this.cinemaTarget.lerp(desiredTarget, 0.12);
+    // Critically-damped feel for in-flight tracking. The hard transition
+    // from another mode is handled by snapping in setCameraMode.
+    this.cinemaPos.lerp(desiredPos, 0.12);
+    this.cinemaTarget.lerp(desiredTarget, 0.18);
     this.camera.position.copy(this.cinemaPos);
     this.camera.lookAt(this.cinemaTarget);
   }
@@ -351,14 +362,35 @@ export class ThreeViewer {
   setCameraMode(mode: CameraMode): void {
     if (mode === this.cameraMode) return;
     this.cameraMode = mode;
+    const qpos = this.state.qpos;
     if (mode === 'cinematic') {
-      // Seed cinema lerp from current pose so the transition is smooth.
-      this.cinemaPos.copy(this.camera.position);
-      this.cinemaTarget.copy(this.controls.target);
       this.controls.enabled = false;
+      if (qpos.length >= 7) {
+        // Snap straight to the desired chase position so we don't transit
+        // *through* the robot from a sideways orbit pose.
+        const bx = qpos[0], by = qpos[1], bz = qpos[2];
+        const qw = qpos[3], qx = qpos[4], qy = qpos[5], qz = qpos[6];
+        const yaw = Math.atan2(2 * (qw * qz + qx * qy), 1 - 2 * (qy * qy + qz * qz));
+        const distance = 1.6;
+        const height = 0.55;
+        this.cinemaPos.set(
+          bx - Math.cos(yaw) * distance,
+          by - Math.sin(yaw) * distance,
+          bz + height,
+        );
+        this.cinemaTarget.set(bx, by, bz + this.robotEyeHeight);
+      } else {
+        this.cinemaPos.copy(this.camera.position);
+        this.cinemaTarget.copy(this.controls.target);
+      }
     } else {
       this.controls.enabled = true;
-      // For 'follow', updateCamera() will retarget to the robot next frame.
+      if (mode === 'follow' && qpos.length >= 7) {
+        // Snap target to robot now; subsequent frames preserve the offset.
+        this.controls.target.set(
+          qpos[0], qpos[1], qpos[2] + this.robotEyeHeight,
+        );
+      }
     }
   }
 
