@@ -1,15 +1,19 @@
 /// <reference lib="webworker" />
-import * as ort from 'onnxruntime-web';
-// Vite hashes wasm/mjs assets in production. ORT's internal loader otherwise
-// asks for the *un*hashed filenames and 404s. `?url` makes Vite emit each
-// file as a build asset and inline its hashed URL here.
-import jsepWasmUrl from 'onnxruntime-web/ort-wasm-simd-threaded.jsep.wasm?url';
-import jsepMjsUrl from 'onnxruntime-web/ort-wasm-simd-threaded.jsep.mjs?url';
+// WASM-only ORT entry point — drops WebGPU/JSEP, runs single-threaded so we
+// don't depend on pthreads + SharedArrayBuffer pipelines that mobile Safari
+// historically chokes on. For our tiny 48→512→256→128→12 MLP this is plenty.
+import * as ort from 'onnxruntime-web/wasm';
+// Vite hashes wasm/mjs files in the production build; ORT's bundled loader
+// asks for the un-hashed names. `?url` returns Vite's hashed asset URL for
+// each file, which we hand to wasmPaths so ORT finds them.
+import wasmUrl from 'onnxruntime-web/ort-wasm-simd-threaded.wasm?url';
+import mjsUrl from 'onnxruntime-web/ort-wasm-simd-threaded.mjs?url';
 import { makeStateView, type ModelView, type SabLayout, type StateView } from '../sim/types';
 import { buildObs } from './obs';
 import { DEFAULT_RUMI_CONFIG, type PolicyConfig } from './policyConfig';
 
-ort.env.wasm.wasmPaths = { wasm: jsepWasmUrl, mjs: jsepMjsUrl };
+ort.env.wasm.numThreads = 1;
+ort.env.wasm.wasmPaths = { wasm: wasmUrl, mjs: mjsUrl };
 
 interface InitMsg {
   type: 'init';
@@ -82,7 +86,7 @@ async function init(msg: InitMsg) {
       const isReal = head.ok && !ct.startsWith('text/html');
       if (isReal) {
         session = await ort.InferenceSession.create(url, {
-          executionProviders: ['webgpu', 'wasm'],
+          executionProviders: ['wasm'],
           graphOptimizationLevel: 'all',
         });
         mode = 'onnx';
