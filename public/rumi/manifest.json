@@ -1,0 +1,11 @@
+{
+  "root": "scene.xml",
+  "files": [
+    "scene.xml",
+    "rumi.xml",
+    "assets/body_with_motor_v2_simple.obj",
+    "assets/coupler_v2.stl",
+    "assets/upper_leg_with_motor_v2_simple.obj",
+    "assets/lower_leg_v2_simple.obj"
+  ]
+}

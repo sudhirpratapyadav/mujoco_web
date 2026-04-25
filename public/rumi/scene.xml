@@ -1,0 +1,50 @@
+<mujoco model="rumi scene">
+  <include file="rumi.xml"/>
+
+  <statistic center="0 0 0.1" extent="0.8" meansize="0.04"/>
+
+  <option timestep="0.005"/>
+
+  <visual>
+    <headlight diffuse=".8 .8 .8" ambient=".2 .2 .2" specular="1 1 1"/>
+    <global azimuth="120" elevation="-20"/>
+    <map force="0.01"/>
+    <quality shadowsize="8192"/>
+  </visual>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="512"/>
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge"
+             rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3" markrgb="0.8 0.8 0.8"
+             width="300" height="300"/>
+    <material name="groundplane" texture="groundplane" texuniform="true"
+              texrepeat="5 5" reflectance="0.2"/>
+  </asset>
+
+  <worldbody>
+    <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"
+          contype="1" conaffinity="0" friction="0.6" condim="3" priority="1"/>
+  </worldbody>
+
+  <!--
+    Home keyframe matches mjlab's INIT_STATE for the velocity task:
+      pos = (0, 0, 0.25), quat = (1, 0, 0, 0)
+      joint_pos (in mjlab/MJC convention, relative to each joint's `ref`):
+        all hips    = 0
+        FL/BL_thigh = -0.0705   FR/BR_thigh =  0.0705
+        FL/BL_calf  = -0.113    FR/BR_calf  =  0.113
+    `default_joint_pos` used by the policy = these values; ctrl matches.
+  -->
+  <keyframe>
+    <key name="home"
+         qpos="0 0 0.25  1 0 0 0
+               0 -0.0705 -0.113
+               0  0.0705  0.113
+               0 -0.0705 -0.113
+               0  0.0705  0.113"
+         ctrl="0 -0.0705 -0.113
+               0  0.0705  0.113
+               0 -0.0705 -0.113
+               0  0.0705  0.113"/>
+  </keyframe>
+</mujoco>
