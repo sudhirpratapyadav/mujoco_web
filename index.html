@@ -2,16 +2,19 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <title>L Square Labs — Live Sim</title>
     <style>
       html, body { margin: 0; padding: 0; height: 100%; background: #111; color: #ddd;
-                   font-family: ui-monospace, Menlo, Consolas, monospace; }
+                   font-family: ui-monospace, Menlo, Consolas, monospace;
+                   overscroll-behavior: none; }
       #app { position: fixed; inset: 0; }
       #hud { position: fixed; top: 8px; left: 8px; padding: 6px 10px;
              background: rgba(0,0,0,0.5); border-radius: 4px; font-size: 12px;
              white-space: pre; pointer-events: none; }
+
+      /* Bottom-center desktop button bar. */
       #controls { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%);
                   display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;
                   padding: 8px 10px; background: rgba(0,0,0,0.55);
@@ -23,12 +26,55 @@
       }
       #controls button:hover { background: #3a3a44; }
       #controls button:active { background: #4a4a54; }
+
+      /* Mobile virtual joysticks (also work with mouse-drag). */
+      .vjoy { position: fixed; bottom: 24px; border-radius: 50%;
+              background: rgba(20, 20, 28, 0.55);
+              border: 2px solid rgba(255, 255, 255, 0.18);
+              touch-action: none; user-select: none; -webkit-user-select: none;
+              z-index: 5; }
+      .vjoy.left  { left: 24px; }
+      .vjoy.right { right: 24px; }
+      .vjoy-thumb { position: absolute; width: 42%; height: 42%;
+                    top: 50%; left: 50%;
+                    transform: translate(-50%, -50%);
+                    border-radius: 50%;
+                    background: radial-gradient(circle at 35% 30%,
+                      rgba(255, 230, 130, 0.9), rgba(220, 180, 0, 0.85));
+                    border: 1px solid rgba(255, 255, 255, 0.4);
+                    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+                    pointer-events: none;
+                    transition: transform 0.04s linear; }
+
+      /* Mobile-only icon bar, top-right corner. */
+      #topbar { position: fixed; top: 8px; right: 8px;
+                display: none; gap: 4px; z-index: 10; }
+      #topbar button { width: 38px; height: 38px;
+                       font-size: 18px; line-height: 1;
+                       background: rgba(20, 20, 28, 0.6); color: #ddd;
+                       border: 1px solid rgba(255, 255, 255, 0.18);
+                       border-radius: 6px; cursor: pointer; }
+      #topbar button:active { background: #3a3a44; }
+
+      /* Phone / narrow tablet layout. */
+      @media (max-width: 768px) {
+        #controls { display: none; }
+        #topbar   { display: flex; }
+        #hud      { font-size: 10px; padding: 4px 6px; max-width: 60vw; }
+      }
+      /* Desktop: hide the on-screen joysticks (keyboard + buttons cover it). */
+      @media (min-width: 769px) {
+        .vjoy { display: none; }
+      }
     </style>
   </head>
   <body>
     <div id="app"></div>
     <div id="hud">booting…</div>
     <div id="controls"></div>
+    <div id="topbar"></div>
+    <div id="joy-left" class="vjoy left"></div>
+    <div id="joy-right" class="vjoy right"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
