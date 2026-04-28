@@ -26,7 +26,7 @@ interface Targets {
   wz: number;
 }
 
-const STEP_LIN = 0.05;
+const STEP_LIN = 0.5;
 const STEP_YAW = 0.1;
 const HELD_LIN = 1.0;
 const HELD_YAW = 1.0;

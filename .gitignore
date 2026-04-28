@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .vite/
+checkpoints/
 *.log
 *.tsbuildinfo
 .DS_Store

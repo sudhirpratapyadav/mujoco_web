@@ -67,6 +67,10 @@ def main():
         output_names=['actions'],
         dynamic_axes={'obs': {0: 'batch'}, 'actions': {0: 'batch'}},
         opset_version=17,
+        # Use the legacy TorchScript exporter so weights are inlined into a
+        # single .onnx file (onnxruntime-web only fetches policy.onnx; the new
+        # dynamo exporter splits weights into a sidecar .onnx.data file).
+        dynamo=False,
     )
     print(f'wrote {args.out}')
 
