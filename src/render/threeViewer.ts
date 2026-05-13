@@ -23,12 +23,12 @@ const CINEMA_ARC_UP = 15.0;      // → apex ~7.5 m up
 // disabled — the scene has no coherent flat ground plane, so we author
 // the placement directly.
 const SPLAT_ROT = new THREE.Euler(-Math.PI / 2, 0, 0);
-const SPLAT_POS = new THREE.Vector3(0, 0, 0);
+const SPLAT_POS = new THREE.Vector3(0, 0, -0.14);
 const SPLAT_SCALE = 1.0;
 // Whether the active asset is a streaming .rad / paged splat (auto-fit via
 // getBoundingBox doesn't work on those — data lives only on the GPU).
 const SPLAT_PAGED = false;
-const SPLAT_BACKGROUND = 0xe8c79a; // sandy beige
+const SPLAT_BACKGROUND = 0x9c5036; // Mars rust
 
 // MuJoCo geom type enum (mjtGeom)
 const GEOM_PLANE = 0;
@@ -92,7 +92,9 @@ export class ThreeViewer {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // PCF (not Soft) — 4-tap vs 16-tap sampling. Big perf win, barely
+    // visible difference at the shadow scale we use.
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     container.appendChild(this.renderer.domElement);
 
     this.scene = new THREE.Scene();
@@ -110,6 +112,12 @@ export class ThreeViewer {
       coneFov: 120.0,
       behindFoveate: 0.2,
       coneFoveate: 0.4,
+      // Perf knobs: clamp expensive splats. maxPixelRadius=256 (default
+      // 512) skips fill-rate-heavy huge gaussians; minAlpha=0.02 drops
+      // near-invisible splats. Background colour matches the Mars scene
+      // so peripheral decimation blends in.
+      maxPixelRadius: 256,
+      minAlpha: 0.02,
     });
     this.scene.add(spark);
     // Keep IBL for the robot's PBR shading — splat doesn't contribute lighting.
@@ -261,10 +269,11 @@ export class ThreeViewer {
     const key = new THREE.DirectionalLight(0xfff1d6, 2.6);
     key.position.set(3, 4, 5);
     key.castShadow = true;
-    key.shadow.mapSize.set(2048, 2048);
+    // 1024 (was 2048) — 4x fewer depth-write pixels per frame.
+    key.shadow.mapSize.set(1024, 1024);
     key.shadow.bias = -1e-4;
     key.shadow.normalBias = 0.02;
-    key.shadow.radius = 4;
+    key.shadow.radius = 2;
     const d = 3;
     key.shadow.camera.left = -d;
     key.shadow.camera.right = d;

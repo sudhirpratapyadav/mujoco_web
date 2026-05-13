@@ -16,8 +16,8 @@ async function main() {
   const policy = await startPolicy(sim.model, sim.sab, sim.layout, `${base}/policy`);
 
   hud.textContent = 'building scene…';
-  // SuperSplat public scene 98e1a8e7 — SOGS bundled as .sog (~30 MB).
-  const splatUrl = `${base}/scene_98e1a8e7.sog`;
+  // SuperSplat public scene 8d5c3046 — SOGS bundled as .sog (~85 MB).
+  const splatUrl = `${base}/scene_8d5c3046.sog`;
   const viewer = new ThreeViewer(app, sim.model, sim.state, splatUrl);
   const input = new KeyboardController(sim, policy, viewer);
 
