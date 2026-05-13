@@ -16,10 +16,8 @@ async function main() {
   const policy = await startPolicy(sim.model, sim.sab, sim.layout, `${base}/policy`);
 
   hud.textContent = 'building scene…';
-  // Desert Canyon Lava Flow — World Labs Marble scene (32 MB ceramic.spz).
-  // Served via the /marble-cdn Vite proxy so the COEP-isolated origin gets
-  // the right cross-origin headers.
-  const splatUrl = `${base}/marble-cdn/ea4356cd-4606-4bc2-8f5d-ea6c862a2d74/f9f64829-44da-4913-a9fc-58bb70d1f58d_ceramic.spz`;
+  // SuperSplat public scene 98e1a8e7 — SOGS bundled as .sog (~30 MB).
+  const splatUrl = `${base}/scene_98e1a8e7.sog`;
   const viewer = new ThreeViewer(app, sim.model, sim.state, splatUrl);
   const input = new KeyboardController(sim, policy, viewer);
 

@@ -5,3 +5,8 @@ checkpoints/
 *.log
 *.tsbuildinfo
 .DS_Store
+
+# Splat scratch assets (kept locally, not pushed)
+public/matrix_city.sog
+public/valley.spz
+public/snow-street.spz

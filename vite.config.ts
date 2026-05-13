@@ -28,6 +28,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/marble-cdn/, ''),
       },
+      '/spark-cdn': {
+        target: 'https://sparkjs.dev',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/spark-cdn/, ''),
+      },
     },
   },
   preview: {

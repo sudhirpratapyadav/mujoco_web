@@ -18,10 +18,10 @@ const CINEMA_SHOT_FRAMES = 900;
 const CINEMA_ARC_OUTWARD = 60.0; // → apex ~30 m to the side
 const CINEMA_ARC_UP = 15.0;      // → apex ~7.5 m up
 
-// Tunable transform for the splat environment. The active scene is the
-// Marble "Desert Canyon Lava Flow" — a single 32 MB .spz, so auto-fit can
-// query its bounding box and drop it onto z=0. The slider in the page
-// then nudges the ground offset live.
+// Tunable transform for the splat environment. Active scene: SuperSplat
+// public scene 98e1a8e7 (forest path), SOGS bundled as .sog. Auto-fit
+// disabled — the scene has no coherent flat ground plane, so we author
+// the placement directly.
 const SPLAT_ROT = new THREE.Euler(-Math.PI / 2, 0, 0);
 const SPLAT_POS = new THREE.Vector3(0, 0, 0);
 const SPLAT_SCALE = 1.0;
@@ -148,7 +148,9 @@ export class ThreeViewer {
       // Auto-fit only fires for non-paged splats (paged data lives in GPU
       // textures only and getBoundingBox returns an empty box). For paged
       // worlds we trust SPLAT_POS / SPLAT_ROT as authored constants.
-      onLoad: SPLAT_PAGED ? undefined : (mesh) => this.fitSplatToGround(mesh),
+      // Auto-fit disabled — the active scene has no flat ground, manual
+      // SPLAT_POS / SPLAT_SCALE constants are authored above instead.
+      onLoad: undefined,
     });
     splat.position.copy(SPLAT_POS);
     splat.rotation.copy(SPLAT_ROT);
@@ -167,13 +169,19 @@ export class ThreeViewer {
    * the splat is at least visible somewhere reasonable.
    */
   private fitSplatToGround(splat: SplatMesh): void {
-    let bb: THREE.Box3;
+    let bb: THREE.Box3 | null = null;
     try {
       bb = splat.getBoundingBox(true);
     } catch {
-      return;
+      bb = null;
     }
-    if (!isFinite(bb.min.x) || !isFinite(bb.max.x)) return;
+    // Some .spz files (e.g. snow-street) leave a fraction of splats with
+    // NaN centers, which makes getBoundingBox return min={null,null,null}.
+    // Fall back to a percentile-filtered scan over the actual splat data.
+    if (!bb || !isFinite(bb.min.x) || !isFinite(bb.max.x)) {
+      bb = this.computeRobustBBox(splat);
+      if (!bb) return;
+    }
     const m = new THREE.Matrix4()
       .makeRotationFromEuler(SPLAT_ROT)
       .scale(new THREE.Vector3(SPLAT_SCALE, SPLAT_SCALE, SPLAT_SCALE));
@@ -198,6 +206,34 @@ export class ThreeViewer {
           scale: splat.scale.x,
         },
       }),
+    );
+  }
+
+  /**
+   * Percentile-filtered AABB over the splat's local centers. Discards 1%
+   * tails on each axis so a handful of stray outlier gaussians don't blow
+   * up the bbox. Returns null if no valid centers were sampled.
+   */
+  private computeRobustBBox(splat: SplatMesh): THREE.Box3 | null {
+    const xs: number[] = [];
+    const ys: number[] = [];
+    const zs: number[] = [];
+    (splat as unknown as {
+      forEachSplat: (cb: (i: number, c: { x: number; y: number; z: number }) => void) => void;
+    }).forEachSplat((_i, c) => {
+      if (Number.isFinite(c.x) && Number.isFinite(c.y) && Number.isFinite(c.z)) {
+        xs.push(c.x); ys.push(c.y); zs.push(c.z);
+      }
+    });
+    if (xs.length === 0) return null;
+    xs.sort((a, b) => a - b);
+    ys.sort((a, b) => a - b);
+    zs.sort((a, b) => a - b);
+    const lo = (a: number[]) => a[Math.floor(a.length * 0.01)];
+    const hi = (a: number[]) => a[Math.floor(a.length * 0.99)];
+    return new THREE.Box3(
+      new THREE.Vector3(lo(xs), lo(ys), lo(zs)),
+      new THREE.Vector3(hi(xs), hi(ys), hi(zs)),
     );
   }
 
@@ -555,10 +591,7 @@ export class ThreeViewer {
   }
 
   cycleCameraMode(): CameraMode {
-    const next: CameraMode =
-      this.cameraMode === 'orbit' ? 'follow'
-      : this.cameraMode === 'follow' ? 'cinematic'
-      : 'orbit';
+    const next: CameraMode = this.cameraMode === 'orbit' ? 'follow' : 'orbit';
     this.setCameraMode(next);
     return next;
   }
